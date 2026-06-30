@@ -1,0 +1,7 @@
+name = "ferro-sentry-install"
+main            = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[routes]]
+pattern = "install.ferrosentry.dev/*"
+zone_name = "ferrosentry.dev"
