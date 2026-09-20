@@ -1,34 +1,44 @@
 /**
- * Ferro-Sentry Install Worker
+ * FerroSentry Install Worker
  *
  * Serves the correct install script based on the client's User-Agent or path:
  *   curl -fsSL https://install.ferrosentry.dev | bash          → install.sh  (Linux/macOS)
  *   irm  https://install.ferrosentry.dev | iex                 → install.ps1 (Windows)
  */
 
-const REPO_RAW = "https://raw.githubusercontent.com/securyblack/ferro-sentry/main/scripts";
+const REPOS = [
+  "https://raw.githubusercontent.com/securyblack/ferro-sentry/main/scripts",
+  "https://raw.githubusercontent.com/securyblack/ferro-sentry/master/scripts",
+];
 
 export default {
   async fetch(req) {
     try {
       const url = new URL(req.url);
       const ua = req.headers.get("User-Agent") ?? "";
-
-      const isWindows = ua.includes("PowerShell") ||
-                        ua.includes("WindowsPowerShell") ||
-                        url.pathname.includes("windows") ||
+      
+      const isWindows = ua.includes("PowerShell") || 
+                        ua.includes("WindowsPowerShell") || 
+                        url.pathname.includes("windows") || 
                         url.pathname.endsWith(".ps1");
 
       const scriptFile = isWindows ? "install.ps1" : "install.sh";
-      const githubUrl = `${REPO_RAW}/${scriptFile}`;
+      
+      let res = null;
+      for (const repoUrl of REPOS) {
+        const githubUrl = `${repoUrl}/${scriptFile}`;
+        const attempt = await fetch(githubUrl, {
+          headers: { "User-Agent": "SecuryBlack-Installer-Worker" },
+          cf: { cacheTtl: 60 },
+        });
+        if (attempt.ok) {
+          res = attempt;
+          break;
+        }
+      }
 
-      const res = await fetch(githubUrl, {
-        headers: { "User-Agent": "SecuryBlack-Installer-Worker" },
-        cf: { cacheTtl: 60 },
-      });
-
-      if (!res.ok) {
-        return new Response(`# Error: Failed to fetch installer script from GitHub (HTTP ${res.status})\n`, {
+      if (!res) {
+        return new Response(`# Error: Failed to fetch installer script from GitHub\n`, {
           status: 502,
           headers: { "Content-Type": "text/plain; charset=utf-8" },
         });
